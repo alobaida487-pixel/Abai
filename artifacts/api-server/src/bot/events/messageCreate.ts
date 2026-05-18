@@ -2,6 +2,7 @@ import { Message, EmbedBuilder, Colors, GuildMember, TextChannel } from "discord
 import { getGuildSettings, getBannedWords } from "../store";
 import { sendLog } from "../utils";
 import { logger } from "../../lib/logger";
+import { handlePrefixCommand, PREFIX } from "../prefix";
 
 const spamTracker = new Map<string, number[]>();
 
@@ -21,6 +22,11 @@ async function jailMember(member: GuildMember, reason: string, timeoutMs: number
 
 export async function handleMessage(message: Message): Promise<void> {
   if (!message.guild || message.author.bot) return;
+
+  if (message.content.startsWith(PREFIX)) {
+    await handlePrefixCommand(message);
+    return;
+  }
 
   const guildId = message.guild.id;
   const settings = getGuildSettings(guildId);
