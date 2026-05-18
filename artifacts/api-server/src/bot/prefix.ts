@@ -8,8 +8,15 @@ import {
   EmbedBuilder,
   Colors,
   BaseChannel,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+  ComponentType,
+  ButtonBuilder,
+  ButtonStyle,
 } from "discord.js";
 import { commandCollection } from "./commands";
+import { sendLog } from "./utils";
 import { logger } from "../lib/logger";
 
 export const PREFIX = "-";
@@ -218,6 +225,124 @@ class FakeInteraction {
   }
 }
 
+// ─── Role select-menu handler ─────────────────────────────────────────────────
+
+const MENTION_RE = /^<@!?(\d+)>$|^(\d{17,20})$/;
+
+async function handleRoleMenu(message: Message): Promise<void> {
+  const guild = message.guild!;
+
+  // Parse target member from message tokens
+  const tokens = tokenize(message.content.slice(PREFIX.length).trim()).slice(1); // skip "role"
+  if (!tokens.length) {
+    await message.reply({ content: `❌ الاستخدام: \`-role @مشخص\`` });
+    return;
+  }
+
+  const memberToken = tokens[0];
+  if (!MENTION_RE.test(memberToken)) {
+    // Has subcommand like "add"/"remove" → fall through to normal handler
+    return;
+  }
+
+  const target = await resolveMember(memberToken, guild);
+  if (!target) {
+    await message.reply({ content: "❌ ما قدرت أجد العضو." });
+    return;
+  }
+
+  // Fetch bot member to know its highest role position
+  const botMember = guild.members.me;
+  const botTop = botMember?.roles.highest.position ?? 0;
+
+  // Build role list: exclude @everyone, managed roles, and roles above bot
+  const roles = guild.roles.cache
+    .filter((r) => r.id !== guild.id && !r.managed && r.position < botTop)
+    .sort((a, b) => b.position - a.position)
+    .first(25);
+
+  if (!roles.length) {
+    await message.reply({ content: "❌ لا توجد رتب يمكن إدارتها." });
+    return;
+  }
+
+  // Build the select menu
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId(`role_menu:${target.id}:${message.author.id}`)
+    .setPlaceholder("اختر رول للإضافة أو الإزالة...")
+    .setMinValues(1)
+    .setMaxValues(1)
+    .addOptions(
+      roles.map((r) => {
+        const hasRole = target.roles.cache.has(r.id);
+        return new StringSelectMenuOptionBuilder()
+          .setLabel(r.name.slice(0, 100))
+          .setValue(r.id)
+          .setDescription(hasRole ? "✅ مضاف — اضغط لإزالته" : "➖ غير مضاف — اضغط لإضافته")
+          .setEmoji(hasRole ? "✅" : "➕");
+      }),
+    );
+
+  const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+
+  const embed = new EmbedBuilder()
+    .setColor(Colors.Blurple)
+    .setTitle("🎭 إدارة الرتب")
+    .setDescription(`اختر رتبة لإضافتها أو إزالتها من ${target}`)
+    .setThumbnail(target.user.displayAvatarURL())
+    .setFooter({ text: "المنيو يغلق بعد 60 ثانية" })
+    .setTimestamp();
+
+  const menuMsg = await message.reply({ embeds: [embed], components: [row] });
+
+  // Collect selection — only the command author can interact
+  const collector = menuMsg.createMessageComponentCollector({
+    componentType: ComponentType.StringSelect,
+    filter: (i) => i.customId.endsWith(`:${message.author.id}`) && i.user.id === message.author.id,
+    time: 60_000,
+    max: 1,
+  });
+
+  collector.on("collect", async (interaction) => {
+    const roleId = interaction.values[0];
+    const role = guild.roles.cache.get(roleId);
+    if (!role) { await interaction.update({ content: "❌ الرول غير موجود.", embeds: [], components: [] }); return; }
+
+    const hasRole = target.roles.cache.has(roleId);
+    const action = hasRole ? "remove" : "add";
+
+    try {
+      if (action === "add") await target.roles.add(role);
+      else await target.roles.remove(role);
+
+      const resultEmbed = new EmbedBuilder()
+        .setColor(action === "add" ? Colors.Green : Colors.Orange)
+        .setTitle(action === "add" ? "✅ تمت إضافة الرول" : "➖ تمت إزالة الرول")
+        .addFields(
+          { name: "العضو", value: `${target}`, inline: true },
+          { name: "الرول", value: `${role}`, inline: true },
+          { name: "المشرف", value: `${message.author}`, inline: true },
+        )
+        .setTimestamp();
+
+      await interaction.update({ embeds: [resultEmbed], components: [] });
+      await sendLog(guild, resultEmbed);
+    } catch {
+      await interaction.update({
+        content: "❌ فشل تنفيذ الأمر. تأكد أن رول البوت أعلى من الرتبة المختارة.",
+        embeds: [],
+        components: [],
+      });
+    }
+  });
+
+  collector.on("end", (_collected, reason) => {
+    if (reason === "time") {
+      menuMsg.edit({ components: [] }).catch(() => {});
+    }
+  });
+}
+
 // ─── Main prefix handler ──────────────────────────────────────────────────────
 
 export async function handlePrefixCommand(message: Message): Promise<void> {
@@ -233,6 +358,16 @@ export async function handlePrefixCommand(message: Message): Promise<void> {
   const cmdName = firstTokens[0].toLowerCase();
   const cmd = commandCollection.get(cmdName);
   if (!cmd) return;
+
+  // ── Special: -role @user → interactive select menu ───────────────────────
+  if (cmdName === "role") {
+    const secondToken = firstTokens[1];
+    // If second token is a mention/ID (not a subcommand word), open the menu
+    if (!secondToken || MENTION_RE.test(secondToken)) {
+      await handleRoleMenu(message);
+      return;
+    }
+  }
 
   const schema = schemas[cmdName];
   if (!schema) {
