@@ -2,6 +2,7 @@ import { Collection } from "discord.js";
 import { moderationCommands } from "./moderation";
 import { channelCommands } from "./channels";
 import { voiceCommands } from "./voice";
+import { voiceJoinCommands } from "./voicejoin";
 import { adminCommands } from "./admin";
 import { wordCommands } from "./words";
 import { infoCommands } from "./info";
@@ -15,6 +16,7 @@ const allCommands: BotCommand[] = [
   ...moderationCommands,
   ...channelCommands,
   ...voiceCommands,
+  ...voiceJoinCommands,
   ...adminCommands,
   ...wordCommands,
   ...infoCommands,

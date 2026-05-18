@@ -8,7 +8,8 @@ const DATA_FILE = path.join(DATA_DIR, "bot-data.json");
 export interface GuildSettings {
   logChannelId?: string;
   joinRoleId?: string;
-  jailVcId?: string;
+  jailChannelId?: string;
+  jailRoleId?: string;
   antiSpamEnabled: boolean;
   spamMessages: number;
   spamSeconds: number;

@@ -158,13 +158,100 @@ export const adminCommands = [
   },
   {
     data: new SlashCommandBuilder()
-      .setName("setjailvc").setDescription("تعيين فويس السجن (يُنقل إليه المخالفون)")
+      .setName("setjailchannel").setDescription("تعيين قناة السجن النصية (يُرسل فيها تنبيه المخالفين)")
       .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
-      .addChannelOption((o) => o.setName("channel").setDescription("قناة الفويس").setRequired(true)),
+      .addChannelOption((o) => o.setName("channel").setDescription("القناة النصية").setRequired(true)),
     async execute(interaction: ChatInputCommandInteraction) {
       const channel = interaction.options.getChannel("channel", true);
-      setGuildSettings(interaction.guild!.id, { jailVcId: channel.id });
-      await interaction.reply({ content: `✅ تم تعيين فويس السجن إلى <#${channel.id}>` });
+      setGuildSettings(interaction.guild!.id, { jailChannelId: channel.id });
+      await interaction.reply({ content: `✅ تم تعيين قناة السجن إلى ${channel}` });
+    },
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName("setjailrole").setDescription("تعيين رول السجن (يُعطى للمخالفين تلقائياً)")
+      .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+      .addRoleOption((o) => o.setName("role").setDescription("رول السجن").setRequired(true)),
+    async execute(interaction: ChatInputCommandInteraction) {
+      const role = interaction.options.getRole("role", true);
+      setGuildSettings(interaction.guild!.id, { jailRoleId: role.id });
+      await interaction.reply({ content: `✅ تم تعيين رول السجن إلى ${role}\n⚠️ تأكد أن هذا الرول يمنع الوصول لجميع القنوات ما عدا قناة السجن.` });
+    },
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName("jail").setDescription("سجن عضو يدوياً (إعطاؤه رول السجن)")
+      .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+      .addUserOption((o) => o.setName("user").setDescription("العضو").setRequired(true))
+      .addStringOption((o) => o.setName("reason").setDescription("السبب"))
+      .addIntegerOption((o) =>
+        o.setName("minutes").setDescription("مدة السجن بالدقائق (0 = دائم حتى /unjail)").setMinValue(0),
+      ),
+    async execute(interaction: ChatInputCommandInteraction) {
+      const target = interaction.options.getMember("user") as GuildMember;
+      const reason = interaction.options.getString("reason") ?? "لا يوجد سبب";
+      const minutes = interaction.options.getInteger("minutes") ?? 0;
+      if (!target) { await interaction.reply({ content: "العضو غير موجود.", flags: 64 }); return; }
+
+      const settings = getGuildSettings(interaction.guild!.id);
+      if (!settings.jailRoleId) {
+        await interaction.reply({ content: "لم يتم تعيين رول السجن بعد. استخدم `/setjailrole` أولاً.", flags: 64 });
+        return;
+      }
+      try {
+        await target.roles.add(settings.jailRoleId);
+        if (minutes > 0) {
+          const ms = minutes * 60 * 1000;
+          await target.timeout(ms, reason);
+          setTimeout(() => target.roles.remove(settings.jailRoleId!).catch(() => {}), ms);
+        }
+
+        const jailCh = settings.jailChannelId
+          ? interaction.guild!.channels.cache.get(settings.jailChannelId) as TextChannel | undefined
+          : null;
+        if (jailCh?.isTextBased()) {
+          await jailCh.send(`🔒 ${target} تم إيداعك في السجن بسبب: **${reason}**${minutes > 0 ? ` لمدة ${minutes} دقيقة.` : " حتى يقرر الإدارة."}`);
+        }
+
+        const embed = new EmbedBuilder()
+          .setColor(Colors.DarkRed).setTitle("🔒 تم السجن")
+          .addFields(
+            { name: "العضو", value: target.user.tag, inline: true },
+            { name: "السبب", value: reason },
+            { name: "المدة", value: minutes > 0 ? `${minutes} دقيقة` : "دائم", inline: true },
+            { name: "المشرف", value: interaction.user.tag },
+          ).setTimestamp();
+        await interaction.reply({ embeds: [embed] });
+        await sendLog(interaction.guild!, embed);
+      } catch { await interaction.reply({ content: "فشل سجن العضو.", flags: 64 }); }
+    },
+  },
+  {
+    data: new SlashCommandBuilder()
+      .setName("unjail").setDescription("الإفراج عن عضو من السجن")
+      .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
+      .addUserOption((o) => o.setName("user").setDescription("العضو").setRequired(true)),
+    async execute(interaction: ChatInputCommandInteraction) {
+      const target = interaction.options.getMember("user") as GuildMember;
+      if (!target) { await interaction.reply({ content: "العضو غير موجود.", flags: 64 }); return; }
+
+      const settings = getGuildSettings(interaction.guild!.id);
+      if (!settings.jailRoleId) {
+        await interaction.reply({ content: "لم يتم تعيين رول السجن.", flags: 64 });
+        return;
+      }
+      try {
+        await target.roles.remove(settings.jailRoleId);
+        await target.timeout(null).catch(() => {});
+        const embed = new EmbedBuilder()
+          .setColor(Colors.Green).setTitle("🔓 الإفراج من السجن")
+          .addFields(
+            { name: "العضو", value: target.user.tag, inline: true },
+            { name: "المشرف", value: interaction.user.tag },
+          ).setTimestamp();
+        await interaction.reply({ embeds: [embed] });
+        await sendLog(interaction.guild!, embed);
+      } catch { await interaction.reply({ content: "فشل الإفراج عن العضو.", flags: 64 }); }
     },
   },
   {
@@ -239,7 +326,8 @@ export const adminCommands = [
         .addFields(
           { name: "قناة اللوق", value: s.logChannelId ? `<#${s.logChannelId}>` : "غير محددة", inline: true },
           { name: "رول الانضمام", value: s.joinRoleId ? `<@&${s.joinRoleId}>` : "غير محدد", inline: true },
-          { name: "فويس السجن", value: s.jailVcId ? `<#${s.jailVcId}>` : "غير محدد", inline: true },
+          { name: "قناة السجن", value: s.jailChannelId ? `<#${s.jailChannelId}>` : "غير محددة", inline: true },
+          { name: "رول السجن", value: s.jailRoleId ? `<@&${s.jailRoleId}>` : "غير محدد", inline: true },
           { name: "الحماية من السبام", value: s.antiSpamEnabled ? "✅ مفعلة" : "❌ معطلة", inline: true },
           { name: "حدود السبام", value: `${s.spamMessages} رسائل / ${s.spamSeconds} ثانية → ${s.spamTimeoutMinutes} دقيقة` },
         ).setTimestamp();
