@@ -54,7 +54,6 @@ const schemas: Record<string, CmdSchema> = {
   slowmode: { args: [{ name: "seconds", type: "integer", required: true }, { name: "channel", type: "channel" }] },
   createchannel: { args: [{ name: "name", type: "string", required: true }, { name: "type", type: "string", required: true }] },
   deletechannel: { args: [{ name: "channel", type: "channel" }, { name: "reason", type: "string", rest: true }] },
-  nuke: { args: [] },
   voicekick: { args: [{ name: "user", type: "member", required: true }] },
   move: { args: [{ name: "user", type: "member", required: true }, { name: "channel", type: "channel", required: true }] },
   mutevc: { args: [{ name: "user", type: "member", required: true }] },

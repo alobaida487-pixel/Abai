@@ -185,31 +185,4 @@ export const channelCommands = [
       }
     },
   },
-  {
-    data: new SlashCommandBuilder()
-      .setName("nuke")
-      .setDescription("نيوك القناة (حذف وإعادة إنشاء)")
-      .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels),
-    async execute(interaction: ChatInputCommandInteraction) {
-      const channel = interaction.channel as TextChannel;
-      try {
-        const position = channel.position;
-        const parent = channel.parent;
-        const topic = channel.topic;
-        const newChannel = await channel.clone({ reason: `Nuke by ${interaction.user.tag}` });
-        await newChannel.setPosition(position);
-        await channel.delete();
-        const embed = new EmbedBuilder()
-          .setColor(Colors.Red)
-          .setTitle("💥 Nuke!")
-          .setDescription("تم حذف وإعادة إنشاء القناة.")
-          .addFields({ name: "المشرف", value: interaction.user.tag })
-          .setTimestamp();
-        await newChannel.send({ embeds: [embed] });
-        await sendLog(interaction.guild!, embed);
-      } catch {
-        await interaction.reply({ content: "فشل نيوك القناة.", flags: 64 });
-      }
-    },
-  },
 ];

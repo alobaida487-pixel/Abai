@@ -140,7 +140,7 @@ export const infoCommands = [
           },
           {
             name: "📺 القنوات",
-            value: "`/lock` `/unlock` `/slowmode` `/createchannel` `/deletechannel` `/nuke`",
+            value: "`/lock` `/unlock` `/slowmode` `/createchannel` `/deletechannel`",
           },
           {
             name: "🔊 الفويس",
