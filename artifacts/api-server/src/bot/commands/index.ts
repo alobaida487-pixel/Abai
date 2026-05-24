@@ -3,13 +3,20 @@ import { setupCommand } from "./setup";
 import { setLanguageCommand } from "./setlanguage";
 import { inviteCommand } from "./invite";
 import { setupRolesCommand } from "./setuproles";
+import { automodCommand } from "./automod";
 
 export interface BotCommand {
   data: { name: string; toJSON(): object };
   execute(interaction: any): Promise<unknown>;
 }
 
-const allCommands: BotCommand[] = [setupCommand, setLanguageCommand, inviteCommand, setupRolesCommand];
+const allCommands: BotCommand[] = [
+  setupCommand,
+  setLanguageCommand,
+  inviteCommand,
+  setupRolesCommand,
+  automodCommand,
+];
 
 export const commandCollection = new Collection<string, BotCommand>();
 
