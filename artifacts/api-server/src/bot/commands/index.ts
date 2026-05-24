@@ -1,13 +1,14 @@
 import { Collection } from "discord.js";
 import { setupCommand } from "./setup";
 import { setLanguageCommand } from "./setlanguage";
+import { inviteCommand } from "./invite";
 
 export interface BotCommand {
   data: { name: string; toJSON(): object };
   execute(interaction: any): Promise<unknown>;
 }
 
-const allCommands: BotCommand[] = [setupCommand, setLanguageCommand];
+const allCommands: BotCommand[] = [setupCommand, setLanguageCommand, inviteCommand];
 
 export const commandCollection = new Collection<string, BotCommand>();
 

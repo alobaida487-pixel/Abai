@@ -36,14 +36,10 @@ export async function handleMessage(message: Message): Promise<void> {
       return;
     }
 
-    // Split long replies into multiple messages
+    // Split long replies into multiple messages — no mention/ping
     const parts = splitForDiscord(reply);
-    for (let i = 0; i < parts.length; i++) {
-      if (i === 0) {
-        await message.reply({ content: parts[i] });
-      } else {
-        await channel.send({ content: parts[i] });
-      }
+    for (const part of parts) {
+      await channel.send({ content: part });
     }
   } catch (err) {
     logger.error({ err }, "Gemini generate error");

@@ -7,6 +7,10 @@
       "spamTimeoutMinutes": 5,
       "jailChannelId": "1504185302074392607",
       "jailRoleId": "1504185184088494191"
+    },
+    "1508159384692199586": {
+      "channelId": "1508161283944480939",
+      "language": "arabic"
     }
   },
   "bannedWords": {
