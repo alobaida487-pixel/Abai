@@ -11,7 +11,6 @@ import { logger } from "../lib/logger";
 import { loadData } from "./store";
 import { commandCollection, commandsJSON } from "./commands";
 import { handleMessage } from "./events/messageCreate";
-import { handleGuildMemberAdd } from "./events/guildMemberAdd";
 
 export function startBot(): void {
   const token = process.env["DISCORD_BOT_TOKEN"];
@@ -31,13 +30,10 @@ export function startBot(): void {
   const client = new Client({
     intents: [
       GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildMembers,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
-      GatewayIntentBits.GuildVoiceStates,
-      GatewayIntentBits.GuildModeration,
     ],
-    partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
+    partials: [Partials.Message, Partials.Channel],
   });
 
   client.once(Events.ClientReady, async (c) => {
@@ -64,12 +60,6 @@ export function startBot(): void {
 
   client.on(Events.MessageCreate, (msg) => {
     handleMessage(msg).catch((err) => logger.error({ err }, "MessageCreate error"));
-  });
-
-  client.on(Events.GuildMemberAdd, (member) => {
-    handleGuildMemberAdd(member).catch((err) =>
-      logger.error({ err }, "GuildMemberAdd error"),
-    );
   });
 
   client.on(Events.Error, (err) => {

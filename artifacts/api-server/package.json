@@ -12,6 +12,7 @@
   "dependencies": {
     "@discordjs/rest": "^2.6.1",
     "@discordjs/voice": "^0.19.2",
+    "@google/genai": "^2.6.0",
     "@snazzah/davey": "^0.1.11",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",

@@ -1,26 +1,13 @@
 import { Collection } from "discord.js";
-import { moderationCommands } from "./moderation";
-import { channelCommands } from "./channels";
-import { voiceCommands } from "./voice";
-import { voiceJoinCommands } from "./voicejoin";
-import { adminCommands } from "./admin";
-import { wordCommands } from "./words";
-import { infoCommands } from "./info";
+import { setupCommand } from "./setup";
+import { setLanguageCommand } from "./setlanguage";
 
 export interface BotCommand {
   data: { name: string; toJSON(): object };
   execute(interaction: any): Promise<unknown>;
 }
 
-const allCommands: BotCommand[] = [
-  ...moderationCommands,
-  ...channelCommands,
-  ...voiceCommands,
-  ...voiceJoinCommands,
-  ...adminCommands,
-  ...wordCommands,
-  ...infoCommands,
-];
+const allCommands: BotCommand[] = [setupCommand, setLanguageCommand];
 
 export const commandCollection = new Collection<string, BotCommand>();
 

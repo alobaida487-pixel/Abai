@@ -5,44 +5,18 @@ import { logger } from "../lib/logger";
 const DATA_DIR = path.join(process.cwd(), "data");
 const DATA_FILE = path.join(DATA_DIR, "bot-data.json");
 
-export interface GuildSettings {
-  logChannelId?: string;
-  joinRoleId?: string;
-  jailChannelId?: string;
-  jailRoleId?: string;
-  antiSpamEnabled: boolean;
-  spamMessages: number;
-  spamSeconds: number;
-  spamTimeoutMinutes: number;
-}
+export type Language = "arabic" | "english";
 
-export interface BannedWord {
-  word: string;
-  action: "timeout" | "delete" | "ban";
-  timeoutMinutes: number;
-}
-
-export interface Warning {
-  userId: string;
-  reason: string;
-  moderatorId: string;
-  timestamp: number;
+interface GuildData {
+  channelId: string | null;
+  language: Language;
 }
 
 interface BotData {
-  guilds: Record<string, GuildSettings>;
-  bannedWords: Record<string, BannedWord[]>;
-  warnings: Record<string, Warning[]>;
+  guilds: Record<string, GuildData>;
 }
 
-const defaultGuildSettings = (): GuildSettings => ({
-  antiSpamEnabled: true,
-  spamMessages: 6,
-  spamSeconds: 5,
-  spamTimeoutMinutes: 5,
-});
-
-let data: BotData = { guilds: {}, bannedWords: {}, warnings: {} };
+let data: BotData = { guilds: {} };
 
 export function loadData(): void {
   try {
@@ -64,53 +38,27 @@ function saveData(): void {
   }
 }
 
-export function getGuildSettings(guildId: string): GuildSettings {
-  if (!data.guilds[guildId]) data.guilds[guildId] = defaultGuildSettings();
+function getGuild(guildId: string): GuildData {
+  if (!data.guilds[guildId]) {
+    data.guilds[guildId] = { channelId: null, language: "arabic" };
+  }
   return data.guilds[guildId];
 }
 
-export function setGuildSettings(guildId: string, settings: Partial<GuildSettings>): void {
-  data.guilds[guildId] = { ...getGuildSettings(guildId), ...settings };
+export function getChannelId(guildId: string): string | null {
+  return getGuild(guildId).channelId;
+}
+
+export function setChannelId(guildId: string, channelId: string): void {
+  getGuild(guildId).channelId = channelId;
   saveData();
 }
 
-export function getBannedWords(guildId: string): BannedWord[] {
-  return data.bannedWords[guildId] || [];
+export function getLanguage(guildId: string): Language {
+  return getGuild(guildId).language;
 }
 
-export function addBannedWord(guildId: string, bw: BannedWord): void {
-  if (!data.bannedWords[guildId]) data.bannedWords[guildId] = [];
-  const idx = data.bannedWords[guildId].findIndex(
-    (w) => w.word.toLowerCase() === bw.word.toLowerCase(),
-  );
-  if (idx >= 0) data.bannedWords[guildId][idx] = bw;
-  else data.bannedWords[guildId].push(bw);
-  saveData();
-}
-
-export function removeBannedWord(guildId: string, word: string): boolean {
-  if (!data.bannedWords[guildId]) return false;
-  const before = data.bannedWords[guildId].length;
-  data.bannedWords[guildId] = data.bannedWords[guildId].filter(
-    (w) => w.word.toLowerCase() !== word.toLowerCase(),
-  );
-  const removed = data.bannedWords[guildId].length < before;
-  if (removed) saveData();
-  return removed;
-}
-
-export function getWarnings(guildId: string, userId: string): Warning[] {
-  return data.warnings[`${guildId}:${userId}`] || [];
-}
-
-export function addWarning(guildId: string, w: Warning): void {
-  const key = `${guildId}:${w.userId}`;
-  if (!data.warnings[key]) data.warnings[key] = [];
-  data.warnings[key].push(w);
-  saveData();
-}
-
-export function clearWarnings(guildId: string, userId: string): void {
-  data.warnings[`${guildId}:${userId}`] = [];
+export function setLanguage(guildId: string, language: Language): void {
+  getGuild(guildId).language = language;
   saveData();
 }
