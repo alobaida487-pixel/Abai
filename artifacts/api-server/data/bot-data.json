@@ -1,0 +1,22 @@
+{
+  "guilds": {
+    "1504131779475406848": {
+      "antiSpamEnabled": true,
+      "spamMessages": 6,
+      "spamSeconds": 5,
+      "spamTimeoutMinutes": 5,
+      "jailChannelId": "1504185302074392607",
+      "jailRoleId": "1504185184088494191"
+    }
+  },
+  "bannedWords": {
+    "1504131779475406848": [
+      {
+        "word": "ش",
+        "action": "delete",
+        "timeoutMinutes": 5
+      }
+    ]
+  },
+  "warnings": {}
+}
