@@ -1,6 +1,6 @@
 import { Message, TextChannel } from "discord.js";
 import { getChannelId, getLanguage } from "../store";
-import { generateReply, splitForDiscord, isApiKeySet } from "../gemini";
+import { generateReply, splitForDiscord, isApiKeySet, classifyGeminiError } from "../gemini";
 import { logger } from "../../lib/logger";
 
 export async function handleMessage(message: Message): Promise<void> {
@@ -43,9 +43,7 @@ export async function handleMessage(message: Message): Promise<void> {
     }
   } catch (err) {
     logger.error({ err }, "Gemini generate error");
-    const errorMsg = err instanceof Error && err.message.includes("GEMINI_API_KEY")
-      ? "⚠️ مفتاح Gemini API غير صحيح أو غير مضاف."
-      : "❌ حدث خطأ أثناء الرد. حاول مرة أخرى.";
-    await message.reply({ content: errorMsg }).catch(() => {});
+    const errorMsg = classifyGeminiError(err);
+    await channel.send({ content: errorMsg }).catch(() => {});
   }
 }

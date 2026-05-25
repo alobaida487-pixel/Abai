@@ -48,7 +48,37 @@ function pushTurn(guildId: string, userId: string, role: Role, text: string): vo
   histories.set(key, history);
 }
 
-// ─── Main generate function ───────────────────────────────────────────────────
+export function clearHistory(guildId: string, userId: string): void {
+  histories.delete(historyKey(guildId, userId));
+}
+
+// ─── Human-readable error classifier ─────────────────────────────────────────
+
+export function classifyGeminiError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  const lower = msg.toLowerCase();
+
+  if (lower.includes("gemini_api_key") || lower.includes("api key") || lower.includes("api_key_invalid")) {
+    return "⚠️ مفتاح Gemini API غير صحيح. تحقق منه في الـ Secrets.";
+  }
+  if (lower.includes("quota") || lower.includes("resource_exhausted") || lower.includes("429")) {
+    return "⚠️ تم تجاوز حد الاستخدام المجاني لـ Gemini API. انتظر قليلاً وحاول مرة أخرى.";
+  }
+  if (lower.includes("safety") || lower.includes("blocked") || lower.includes("harm")) {
+    return "⚠️ الرسالة خالفت سياسة السلامة، جرب صياغة مختلفة.";
+  }
+  if (lower.includes("503") || lower.includes("unavailable") || lower.includes("overloaded")) {
+    return "⚠️ خوادم Gemini مشغولة حالياً، حاول مرة أخرى بعد ثوانٍ.";
+  }
+  if (lower.includes("recitation")) {
+    return "⚠️ لم يتمكن الذكاء الاصطناعي من الرد على هذا السؤال تحديداً.";
+  }
+  return `❌ خطأ غير متوقع: ${msg.slice(0, 120)}`;
+}
+
+// ─── Main generate function with retry ───────────────────────────────────────
+
+const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
 export async function generateReply(
   userMessage: string,
@@ -64,22 +94,43 @@ export async function generateReply(
     { role: "user" as const, parts: [{ text: userMessage }] },
   ];
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents,
-    config: {
-      systemInstruction: SYSTEM[language],
-      maxOutputTokens: 8192,
-    },
-  });
+  let lastErr: unknown;
 
-  const reply = response.text ?? "";
+  // Try up to 2 times, with 1.5 s between attempts
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 1500));
 
-  // Save both turns to history after a successful response
-  pushTurn(guildId, userId, "user", userMessage);
-  pushTurn(guildId, userId, "model", reply);
+    for (const model of MODELS) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction: SYSTEM[language],
+            maxOutputTokens: 8192,
+          },
+        });
 
-  return reply;
+        const reply = response.text ?? "";
+        if (!reply) continue;
+
+        pushTurn(guildId, userId, "user", userMessage);
+        pushTurn(guildId, userId, "model", reply);
+        return reply;
+      } catch (err) {
+        lastErr = err;
+        logger.warn({ err, model, attempt }, "Gemini model attempt failed");
+
+        const msg = err instanceof Error ? err.message.toLowerCase() : "";
+        // Don't retry on quota or safety errors — they won't change with a different model
+        if (msg.includes("quota") || msg.includes("429") || msg.includes("safety") || msg.includes("blocked")) {
+          throw err;
+        }
+      }
+    }
+  }
+
+  throw lastErr;
 }
 
 export function isApiKeySet(): boolean {
